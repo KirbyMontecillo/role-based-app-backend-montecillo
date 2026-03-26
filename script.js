@@ -78,6 +78,11 @@ function removeButtonLoading(button) {
     }
 }
 
+function getAuthHeader() {
+    const token = sessionStorage.getItem('authToken');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 const STORAGE_KEY = 'ipt_demo_v1';
 
 window.db = {
@@ -145,7 +150,7 @@ function setAuthState(isAuth, user = null) {
         currentUser = user;
         body.classList.remove('not-authenticated');
         body.classList.add('authenticated');
-        if (user.role === 'Admin') {
+        if (user.role === 'Admin' || user.role === 'admin') {
             body.classList.add('is-admin');
         } else {
             body.classList.remove('is-admin');
@@ -178,7 +183,7 @@ function handleRouting() {
         return;
     }
     
-    if (adminRoutes.includes(route) && (!currentUser || currentUser.role !== 'Admin')) {
+    if (adminRoutes.includes(route) && (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'admin'))) {
         navigateTo('#/profile');
         return;
     }
@@ -298,58 +303,82 @@ getStartedBtn.addEventListener('click', () => {
     navigateTo('#/register');
 });
 
-registerForm.addEventListener('submit', (e) => {
+registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     const firstName = document.getElementById('regFirstName').value;
     const lastName = document.getElementById('regLastName').value;
     const email = document.getElementById('regEmail').value;
     const password = document.getElementById('regPassword').value;
-    
+
     if (password.length < 6) {
         showToast('password must be at least 6 characters long', 'error');
         return;
     }
-    
-    const existingAccount = window.db.accounts.find(acc => acc.email === email);
-    if (existingAccount) {
-        showToast('an account with this email already exists', 'error');
-        return;
+
+    try {
+        const response = await fetch('http://localhost:3000/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ firstName, lastName, email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok || data.error === 'user already exists') {
+            // Proceed to verification whether new or already registered
+            localStorage.setItem('unverified_email', email);
+            localStorage.setItem('pendingUser', JSON.stringify({ 
+                firstName, lastName, email, password, role: 'User', verified: false 
+            }));
+            showToast('registration successful! please verify your email', 'success');
+            verifyEmailDisplay.textContent = email;
+            navigateTo('#/verify-email');
+            registerForm.reset();
+        } else {
+            showToast(data.error || 'registration failed', 'error');
+        }
+
+    } catch (err) {
+        showToast('cannot connect to backend', 'error');
+        console.error(err);
     }
-    
-    const userData = {
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        password: password,
-        role: 'User',
-        verified: false
-    };
-    
-    localStorage.setItem('unverified_email', email);
-    localStorage.setItem('pendingUser', JSON.stringify(userData));
-    
-    showToast('registration successful! please verify your email', 'success');
-    
-    verifyEmailDisplay.textContent = email;
-    navigateTo('#/verify-email');
-    
-    registerForm.reset();
 });
 
-simulateVerifyBtn.addEventListener('click', () => {
+simulateVerifyBtn.addEventListener('click', async () => {
     const userData = JSON.parse(localStorage.getItem('pendingUser'));
     const unverifiedEmail = localStorage.getItem('unverified_email');
-    
+
     if (userData && unverifiedEmail === userData.email) {
+        try {
+            // First try to register on backend (in case server restarted)
+            await fetch('http://localhost:3000/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(userData)
+            });
+        } catch (err) {
+            console.log('backend unavailable');
+        }
+
+        try {
+            // Then verify
+            await fetch('http://localhost:3000/api/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: userData.email })
+            });
+        } catch (err) {
+            console.log('backend unavailable, verifying locally only');
+        }
+
+        // Always update localStorage too
         userData.verified = true;
         window.db.accounts.push(userData);
         saveToStorage();
-        
         localStorage.removeItem('pendingUser');
         localStorage.removeItem('unverified_email');
-        
-        verifiedAlert.style.display = 'block';
+
         showToast('email verified successfully!', 'success');
         navigateTo('#/login');
     } else {
@@ -371,38 +400,71 @@ loginBtn.addEventListener('click', (e) => {
     navigateTo('#/login');
 });
 
-loginForm.addEventListener('submit', (e) => {
+// Updated Login... tries API first, falls back to local 
+loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
-    
-    const account = window.db.accounts.find(acc => 
-        acc.email === email && 
-        acc.password === password && 
-        acc.verified === true
-    );
-    
-    if (account) {
-        const loggedInUser = {
-            firstName: account.firstName,
-            lastName: account.lastName,
-            email: account.email,
-            role: account.role
-        };
-        
-        localStorage.setItem('auth_token', email);
-        localStorage.setItem('loggedInUser', JSON.stringify(loggedInUser));
-        
-        setAuthState(true, loggedInUser);
-        showLoggedInNav(loggedInUser);
-        
-        showToast(`welcome back, ${loggedInUser.firstName}!`, 'success');
-        
-        navigateTo('#/profile');
-        loginForm.reset();
-    } else {
-        showToast('invalid email or password, or email not verified', 'error');
+    const submitBtn = loginForm.querySelector('button[type="submit"]');
+
+    setButtonLoading(submitBtn);
+
+    try {
+        const response = await fetch('http://localhost:3000/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Save token in sessionStorage
+            sessionStorage.setItem('authToken', data.token);
+
+            const loggedInUser = data.user;
+            localStorage.setItem('loggedInUser', JSON.stringify(loggedInUser));
+
+            setAuthState(true, loggedInUser);
+            showLoggedInNav(loggedInUser);
+
+            showToast(`welcome back, ${loggedInUser.firstName}!`, 'success');
+            navigateTo('#/profile');
+            loginForm.reset();
+        } else {
+            showToast(data.error || 'invalid email or password', 'error');
+        }
+    } catch (err) {
+        // Fallback: API unavailable, use local window.db
+        const account = window.db.accounts.find(acc =>
+            acc.email === email &&
+            acc.password === password &&
+            acc.verified === true
+        );
+
+        if (account) {
+            const loggedInUser = {
+                firstName: account.firstName,
+                lastName: account.lastName,
+                email: account.email,
+                role: account.role
+            };
+
+            sessionStorage.setItem('authToken', email);
+            localStorage.setItem('loggedInUser', JSON.stringify(loggedInUser));
+
+            setAuthState(true, loggedInUser);
+            showLoggedInNav(loggedInUser);
+
+            showToast(`welcome back, ${loggedInUser.firstName}!`, 'success');
+            navigateTo('#/profile');
+            loginForm.reset();
+        } else {
+            showToast('invalid email or password, or email not verified', 'error');
+        }
+    } finally {
+        removeButtonLoading(submitBtn);
     }
 });
 
@@ -412,11 +474,11 @@ function showLoggedInNav(user) {
     usernameDisplay.textContent = user.firstName || 'Admin';
 
     document.querySelectorAll('.role-admin').forEach(link => {
-        link.style.display = user.role === 'Admin' ? 'block' : 'none';
+        link.style.display = (user.role === 'Admin' || user.role === 'admin') ? 'block' : 'none';
     });
     
     document.querySelectorAll('.role-user').forEach(link => {
-        link.style.display = user.role === 'User' ? 'block' : 'none';
+        link.style.display = (user.role === 'User' || user.role === 'user') ? 'block' : 'none';
     });
 }
 
@@ -457,6 +519,7 @@ logoutLink.addEventListener('click', (e) => {
     
     localStorage.removeItem('auth_token');
     localStorage.removeItem('loggedInUser');
+    sessionStorage.removeItem('authToken');
     
     setAuthState(false);
     
@@ -975,7 +1038,7 @@ window.addEventListener('load', () => {
         window.location.hash = '#/';
     }
     
-    const authToken = localStorage.getItem('auth_token');
+    const authToken = sessionStorage.getItem('authToken') || localStorage.getItem('auth_token');
     const loggedInUser = localStorage.getItem('loggedInUser');
     
     if (authToken && loggedInUser) {
