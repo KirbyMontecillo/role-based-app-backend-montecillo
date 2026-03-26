@@ -338,6 +338,6 @@ initDB()
         });
     })
     .catch(err => {
-        console.error('Failed to initialise DB:', err.message);
+        console.error('Failed to initialise DB:', err);
         process.exit(1);
     });
