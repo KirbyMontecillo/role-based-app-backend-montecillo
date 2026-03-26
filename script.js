@@ -1,5 +1,6 @@
 let currentUser = null;
 
+// ─── TOAST ───────────────────────────────────────────────────
 function showToast(message, type = 'info', duration = 3000) {
     let container = document.getElementById('toast-container');
     if (!container) {
@@ -7,41 +8,35 @@ function showToast(message, type = 'info', duration = 3000) {
         container.id = 'toast-container';
         document.body.appendChild(container);
     }
-    
     const toast = document.createElement('div');
     toast.className = `toast-notification ${type}`;
     const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
-    
     toast.innerHTML = `
         <span class="toast-icon">${icons[type] || icons.info}</span>
         <span class="toast-message">${message}</span>
         <button class="toast-close" onclick="this.parentElement.remove()">×</button>
     `;
-    
     container.appendChild(toast);
-    
     setTimeout(() => {
         toast.classList.add('removing');
-        setTimeout(() => {
-            if (toast.parentElement) toast.remove();
-        }, 300);
+        setTimeout(() => { if (toast.parentElement) toast.remove(); }, 300);
     }, duration);
 }
 
+// ─── FORM VALIDATION HELPERS ──────────────────────────────────
 function validateField(field, isValid, message = '') {
     field.classList.remove('is-valid', 'is-invalid');
-    const existingFeedback = field.parentElement.querySelector('.invalid-feedback, .valid-feedback');
-    if (existingFeedback) existingFeedback.remove();
-    
+    const existing = field.parentElement.querySelector('.invalid-feedback, .valid-feedback');
+    if (existing) existing.remove();
     if (isValid) {
         field.classList.add('is-valid');
     } else {
         field.classList.add('is-invalid');
         if (message) {
-            const feedback = document.createElement('div');
-            feedback.className = 'invalid-feedback';
-            feedback.textContent = message;
-            field.parentElement.appendChild(feedback);
+            const fb = document.createElement('div');
+            fb.className = 'invalid-feedback';
+            fb.textContent = message;
+            field.parentElement.appendChild(fb);
         }
     }
 }
@@ -57,10 +52,8 @@ function validatePassword(password) {
 }
 
 function clearFormValidation(form) {
-    form.querySelectorAll('.is-valid, .is-invalid').forEach(field => {
-        field.classList.remove('is-valid', 'is-invalid');
-    });
-    form.querySelectorAll('.invalid-feedback, .valid-feedback').forEach(feedback => feedback.remove());
+    form.querySelectorAll('.is-valid, .is-invalid').forEach(f => f.classList.remove('is-valid', 'is-invalid'));
+    form.querySelectorAll('.invalid-feedback, .valid-feedback').forEach(fb => fb.remove());
 }
 
 function setButtonLoading(button) {
@@ -83,14 +76,10 @@ function getAuthHeader() {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// ─── LOCAL DB ────────────────────────────────────────────────
 const STORAGE_KEY = 'ipt_demo_v1';
 
-window.db = {
-    accounts: [],
-    employees: [],
-    departments: [],
-    requests: []
-};
+window.db = { accounts: [], employees: [], departments: [], requests: [] };
 
 function loadFromStorage() {
     try {
@@ -114,12 +103,9 @@ function loadFromStorage() {
 function seedInitialData() {
     window.db = {
         accounts: [{
-            firstName: 'Admin',
-            lastName: 'User',
-            email: 'admin@example.com',
-            password: 'Password123!',
-            role: 'Admin',
-            verified: true
+            firstName: 'Admin', lastName: 'User',
+            email: 'admin@example.com', password: 'Password123!',
+            role: 'Admin', verified: true
         }],
         employees: [],
         departments: [
@@ -134,18 +120,15 @@ function seedInitialData() {
 }
 
 function saveToStorage() {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(window.db));
-    } catch (error) {
-        console.error('error saving to storage:', error);
-    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(window.db)); }
+    catch (e) { console.error('error saving to storage:', e); }
 }
 
 loadFromStorage();
 
+// ─── AUTH STATE ──────────────────────────────────────────────
 function setAuthState(isAuth, user = null) {
     const body = document.body;
-    
     if (isAuth && user) {
         currentUser = user;
         body.classList.remove('not-authenticated');
@@ -162,77 +145,43 @@ function setAuthState(isAuth, user = null) {
     }
 }
 
-function navigateTo(hash) {
-    window.location.hash = hash;
-}
+// ─── ROUTING ─────────────────────────────────────────────────
+function navigateTo(hash) { window.location.hash = hash; }
 
 function handleRouting() {
     const hash = window.location.hash || '#/';
     const route = hash.substring(2);
-    
+
     document.querySelectorAll('section').forEach(page => {
         page.style.display = 'none';
         page.classList.remove('active');
     });
-    
+
     const protectedRoutes = ['profile', 'employees', 'departments', 'accounts', 'my-requests', 'all-requests'];
-    const adminRoutes = ['employees', 'departments', 'accounts', 'all-requests'];
-    
-    if (protectedRoutes.includes(route) && !currentUser) {
-        navigateTo('#/login');
-        return;
-    }
-    
+    const adminRoutes    = ['employees', 'departments', 'accounts', 'all-requests'];
+
+    if (protectedRoutes.includes(route) && !currentUser) { navigateTo('#/login'); return; }
     if (adminRoutes.includes(route) && (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'admin'))) {
-        navigateTo('#/profile');
-        return;
+        navigateTo('#/profile'); return;
     }
-    
+
     let pageToShow = null;
-    
-    switch(route) {
-        case '':
-        case 'home':
-            pageToShow = document.getElementById('homeSection');
-            break;
-        case 'login':
-            pageToShow = document.getElementById('loginSection');
-            break;
-        case 'register':
-            pageToShow = document.getElementById('registerSection');
-            break;
-        case 'verify-email':
-            pageToShow = document.getElementById('verifyEmailSection');
-            break;
-        case 'profile':
-            pageToShow = document.getElementById('profileSection');
-            renderProfile();
-            break;
-        case 'employees':
-            pageToShow = document.getElementById('employeesSection');
-            loadEmployees();
-            break;
-        case 'departments':
-            pageToShow = document.getElementById('departmentsSection');
-            loadDepartments();
-            break;
-        case 'accounts':
-            pageToShow = document.getElementById('accountsSection');
-            loadAccounts();
-            break;
-        case 'my-requests':
-            pageToShow = document.getElementById('myRequestsSection');
-            loadMyRequests();
-            break;
-        case 'all-requests':
-            pageToShow = document.getElementById('allRequestsSection');
-            loadAllRequests();
-            break;
-        default:
-            navigateTo('#/');
-            return;
+    switch (route) {
+        case '': case 'home':        pageToShow = document.getElementById('homeSection'); break;
+        case 'login':                pageToShow = document.getElementById('loginSection'); break;
+        case 'register':             pageToShow = document.getElementById('registerSection'); break;
+        case 'verify-email':         pageToShow = document.getElementById('verifyEmailSection'); break;
+        case 'forgot-password':      pageToShow = document.getElementById('forgotPasswordSection'); break;
+        case 'reset-password':       pageToShow = document.getElementById('resetPasswordSection'); break;
+        case 'profile':              pageToShow = document.getElementById('profileSection'); renderProfile(); break;
+        case 'employees':            pageToShow = document.getElementById('employeesSection'); loadEmployees(); break;
+        case 'departments':          pageToShow = document.getElementById('departmentsSection'); loadDepartments(); break;
+        case 'accounts':             pageToShow = document.getElementById('accountsSection'); loadAccounts(); break;
+        case 'my-requests':          pageToShow = document.getElementById('myRequestsSection'); loadMyRequests(); break;
+        case 'all-requests':         pageToShow = document.getElementById('allRequestsSection'); loadAllRequests(); break;
+        default: navigateTo('#/'); return;
     }
-    
+
     if (pageToShow) {
         pageToShow.style.display = 'block';
         pageToShow.classList.add('active');
@@ -241,80 +190,69 @@ function handleRouting() {
 
 window.addEventListener('hashchange', handleRouting);
 
-const homeSection = document.getElementById('homeSection');
-const registerSection = document.getElementById('registerSection');
-const loginBtn = document.getElementById('loginBtn');
-const registerBtn = document.getElementById('registerBtn');
-const getStartedBtn = document.getElementById('getStartedBtn');
-const cancelRegisterBtn = document.getElementById('cancelRegisterBtn');
-const registerForm = document.getElementById('registerForm');
-const verifyEmailSection = document.getElementById('verifyEmailSection');
-const loginSection = document.getElementById('loginSection');
-const verifyEmailDisplay = document.getElementById('verifyEmailDisplay');
-const simulateVerifyBtn = document.getElementById('simulateVerifyBtn');
-const goToLoginBtn = document.getElementById('goToLoginBtn');
-const verifiedAlert = document.getElementById('verifiedAlert');
-const cancelLoginBtn = document.getElementById('cancelLoginBtn');
-const navLoggedIn = document.getElementById('navLoggedIn');
-const navNotLoggedIn = document.getElementById('navNotLoggedIn');
-const usernameDisplay = document.getElementById('usernameDisplay');
-const profileSection = document.getElementById('profileSection');
-const employeesSection = document.getElementById('employeesSection');
-const profileLink = document.getElementById('profileLink');
-const employeesLink = document.getElementById('employeesLink');
-const logoutLink = document.getElementById('logoutLink');
-const loginForm = document.getElementById('loginForm');
-const addEmployeeBtn = document.getElementById('addEmployeeBtn');
-const employeeFormSection = document.getElementById('employeeFormSection');
-const cancelEmployeeBtn = document.getElementById('cancelEmployeeBtn');
-const departmentsSection = document.getElementById('departmentsSection');
-const accountsSection = document.getElementById('accountsSection');
-const departmentsLink = document.getElementById('departmentsLink');
-const accountsLink = document.getElementById('accountsLink');
-const addDepartmentBtn = document.getElementById('addDepartmentBtn');
-const addAccountBtn = document.getElementById('addAccountBtn');
-const departmentFormSection = document.getElementById('departmentFormSection');
-const accountFormSection = document.getElementById('accountFormSection');
-const cancelDepartmentBtn = document.getElementById('cancelDepartmentBtn');
-const cancelAccountBtn = document.getElementById('cancelAccountBtn');
-const resetPasswordBtn = document.getElementById('resetPasswordBtn');
-const myRequestsSection = document.getElementById('myRequestsSection');
-const myRequestsLink = document.getElementById('myRequestsLink');
-const newRequestBtn = document.getElementById('newRequestBtn');
-const createFirstRequestBtn = document.getElementById('createFirstRequestBtn');
-const requestModal = document.getElementById('requestModal');
-const closeRequestModal = document.getElementById('closeRequestModal');
-const requestForm = document.getElementById('requestForm');
-const noRequestsMessage = document.getElementById('noRequestsMessage');
-const requestsTable = document.getElementById('requestsTable');
-const allRequestsSection = document.getElementById('allRequestsSection');
-const allRequestsLink = document.getElementById('allRequestsLink');
+// ─── NAV ELEMENT REFS ─────────────────────────────────────────
+const homeSection          = document.getElementById('homeSection');
+const registerSection      = document.getElementById('registerSection');
+const loginBtn             = document.getElementById('loginBtn');
+const registerBtn          = document.getElementById('registerBtn');
+const getStartedBtn        = document.getElementById('getStartedBtn');
+const cancelRegisterBtn    = document.getElementById('cancelRegisterBtn');
+const registerForm         = document.getElementById('registerForm');
+const verifyEmailSection   = document.getElementById('verifyEmailSection');
+const loginSection         = document.getElementById('loginSection');
+const verifyEmailDisplay   = document.getElementById('verifyEmailDisplay');
+const simulateVerifyBtn    = document.getElementById('simulateVerifyBtn');
+const goToLoginBtn         = document.getElementById('goToLoginBtn');
+const verifiedAlert        = document.getElementById('verifiedAlert');
+const cancelLoginBtn       = document.getElementById('cancelLoginBtn');
+const navLoggedIn          = document.getElementById('navLoggedIn');
+const navNotLoggedIn       = document.getElementById('navNotLoggedIn');
+const usernameDisplay      = document.getElementById('usernameDisplay');
+const profileSection       = document.getElementById('profileSection');
+const employeesSection     = document.getElementById('employeesSection');
+const profileLink          = document.getElementById('profileLink');
+const employeesLink        = document.getElementById('employeesLink');
+const logoutLink           = document.getElementById('logoutLink');
+const loginForm            = document.getElementById('loginForm');
+const addEmployeeBtn       = document.getElementById('addEmployeeBtn');
+const employeeFormSection  = document.getElementById('employeeFormSection');
+const cancelEmployeeBtn    = document.getElementById('cancelEmployeeBtn');
+const departmentsSection   = document.getElementById('departmentsSection');
+const accountsSection      = document.getElementById('accountsSection');
+const departmentsLink      = document.getElementById('departmentsLink');
+const accountsLink         = document.getElementById('accountsLink');
+const addDepartmentBtn     = document.getElementById('addDepartmentBtn');
+const addAccountBtn        = document.getElementById('addAccountBtn');
+const departmentFormSection= document.getElementById('departmentFormSection');
+const accountFormSection   = document.getElementById('accountFormSection');
+const cancelDepartmentBtn  = document.getElementById('cancelDepartmentBtn');
+const cancelAccountBtn     = document.getElementById('cancelAccountBtn');
+const resetPasswordBtn     = document.getElementById('resetPasswordBtn');
+const myRequestsSection    = document.getElementById('myRequestsSection');
+const myRequestsLink       = document.getElementById('myRequestsLink');
+const newRequestBtn        = document.getElementById('newRequestBtn');
+const createFirstRequestBtn= document.getElementById('createFirstRequestBtn');
+const requestModal         = document.getElementById('requestModal');
+const closeRequestModal    = document.getElementById('closeRequestModal');
+const requestForm          = document.getElementById('requestForm');
+const noRequestsMessage    = document.getElementById('noRequestsMessage');
+const requestsTable        = document.getElementById('requestsTable');
+const allRequestsSection   = document.getElementById('allRequestsSection');
+const allRequestsLink      = document.getElementById('allRequestsLink');
 
-registerBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    navigateTo('#/register');
-});
-
-cancelRegisterBtn.addEventListener('click', () => {
-    navigateTo('#/');
-});
-
-getStartedBtn.addEventListener('click', () => {
-    navigateTo('#/register');
-});
+// ─── REGISTER ────────────────────────────────────────────────
+registerBtn.addEventListener('click', (e) => { e.preventDefault(); navigateTo('#/register'); });
+cancelRegisterBtn.addEventListener('click', () => navigateTo('#/'));
+getStartedBtn.addEventListener('click', () => navigateTo('#/register'));
 
 registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const firstName = document.getElementById('regFirstName').value;
-    const lastName = document.getElementById('regLastName').value;
-    const email = document.getElementById('regEmail').value;
-    const password = document.getElementById('regPassword').value;
+    const lastName  = document.getElementById('regLastName').value;
+    const email     = document.getElementById('regEmail').value;
+    const password  = document.getElementById('regPassword').value;
 
-    if (password.length < 6) {
-        showToast('password must be at least 6 characters long', 'error');
-        return;
-    }
+    if (password.length < 6) { showToast('password must be at least 6 characters long', 'error'); return; }
 
     try {
         const response = await fetch('http://localhost:3000/api/register', {
@@ -322,15 +260,11 @@ registerForm.addEventListener('submit', async (e) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ firstName, lastName, email, password })
         });
-
         const data = await response.json();
 
         if (response.ok || data.error === 'user already exists') {
-            // Proceed to verification whether new or already registered
             localStorage.setItem('unverified_email', email);
-            localStorage.setItem('pendingUser', JSON.stringify({ 
-                firstName, lastName, email, password, role: 'User', verified: false 
-            }));
+            localStorage.setItem('pendingUser', JSON.stringify({ firstName, lastName, email, password, role: 'User', verified: false }));
             showToast('registration successful! please verify your email', 'success');
             verifyEmailDisplay.textContent = email;
             navigateTo('#/verify-email');
@@ -338,41 +272,32 @@ registerForm.addEventListener('submit', async (e) => {
         } else {
             showToast(data.error || 'registration failed', 'error');
         }
-
     } catch (err) {
         showToast('cannot connect to backend', 'error');
         console.error(err);
     }
 });
 
+// ─── VERIFY EMAIL ─────────────────────────────────────────────
 simulateVerifyBtn.addEventListener('click', async () => {
     const userData = JSON.parse(localStorage.getItem('pendingUser'));
     const unverifiedEmail = localStorage.getItem('unverified_email');
 
     if (userData && unverifiedEmail === userData.email) {
         try {
-            // First try to register on backend (in case server restarted)
             await fetch('http://localhost:3000/api/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(userData)
             });
-        } catch (err) {
-            console.log('backend unavailable');
-        }
+        } catch (_) {}
 
         try {
-            // Then verify
             await fetch('http://localhost:3000/api/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: userData.email })
             });
-        } catch (err) {
-            console.log('backend unavailable, verifying locally only');
-        }
+        } catch (_) {}
 
-        // Always update localStorage too
         userData.verified = true;
         window.db.accounts.push(userData);
         saveToStorage();
@@ -386,28 +311,16 @@ simulateVerifyBtn.addEventListener('click', async () => {
     }
 });
 
-goToLoginBtn.addEventListener('click', () => {
-    navigateTo('#/login');
-});
+goToLoginBtn.addEventListener('click', () => navigateTo('#/login'));
+cancelLoginBtn.addEventListener('click', () => { verifiedAlert.style.display = 'none'; navigateTo('#/'); });
+loginBtn.addEventListener('click', (e) => { e.preventDefault(); navigateTo('#/login'); });
 
-cancelLoginBtn.addEventListener('click', () => {
-    verifiedAlert.style.display = 'none';
-    navigateTo('#/');
-});
-
-loginBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    navigateTo('#/login');
-});
-
-// Updated Login... tries API first, falls back to local 
+// ─── LOGIN ───────────────────────────────────────────────────
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-
-    const email = document.getElementById('loginEmail').value;
+    const email    = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     const submitBtn = loginForm.querySelector('button[type="submit"]');
-
     setButtonLoading(submitBtn);
 
     try {
@@ -416,47 +329,30 @@ loginForm.addEventListener('submit', async (e) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         });
-
         const data = await response.json();
 
         if (response.ok) {
-            // Save token in sessionStorage
             sessionStorage.setItem('authToken', data.token);
-
-            const loggedInUser = data.user;
-            localStorage.setItem('loggedInUser', JSON.stringify(loggedInUser));
-
-            setAuthState(true, loggedInUser);
-            showLoggedInNav(loggedInUser);
-
-            showToast(`welcome back, ${loggedInUser.firstName}!`, 'success');
+            localStorage.setItem('loggedInUser', JSON.stringify(data.user));
+            setAuthState(true, data.user);
+            showLoggedInNav(data.user);
+            showToast(`welcome back, ${data.user.firstName}!`, 'success');
             navigateTo('#/profile');
             loginForm.reset();
         } else {
             showToast(data.error || 'invalid email or password', 'error');
         }
     } catch (err) {
-        // Fallback: API unavailable, use local window.db
+        // Fallback to local db
         const account = window.db.accounts.find(acc =>
-            acc.email === email &&
-            acc.password === password &&
-            acc.verified === true
+            acc.email === email && acc.password === password && acc.verified === true
         );
-
         if (account) {
-            const loggedInUser = {
-                firstName: account.firstName,
-                lastName: account.lastName,
-                email: account.email,
-                role: account.role
-            };
-
+            const loggedInUser = { firstName: account.firstName, lastName: account.lastName, email: account.email, role: account.role };
             sessionStorage.setItem('authToken', email);
             localStorage.setItem('loggedInUser', JSON.stringify(loggedInUser));
-
             setAuthState(true, loggedInUser);
             showLoggedInNav(loggedInUser);
-
             showToast(`welcome back, ${loggedInUser.firstName}!`, 'success');
             navigateTo('#/profile');
             loginForm.reset();
@@ -468,15 +364,134 @@ loginForm.addEventListener('submit', async (e) => {
     }
 });
 
+// ─── LOGOUT (calls API to blacklist token) ────────────────────
+logoutLink.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const userName = currentUser ? currentUser.firstName : 'user';
+    const token = sessionStorage.getItem('authToken');
+
+    // Tell the server to blacklist the token
+    if (token) {
+        try {
+            await fetch('http://localhost:3000/api/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+        } catch (_) {
+            // Backend unavailable — still clear client-side state
+        }
+    }
+
+    // Clear ALL client-side auth state
+    sessionStorage.removeItem('authToken');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('loggedInUser');
+
+    setAuthState(false);
+    navLoggedIn.style.display = 'none';
+    navNotLoggedIn.style.display = 'flex';
+
+    showToast(`goodbye, ${userName}!`, 'info');
+    navigateTo('#/');
+});
+
+// ─── FORGOT PASSWORD ──────────────────────────────────────────
+// "Forgot password?" link on login page triggers this section
+document.getElementById('forgotPasswordLink')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    navigateTo('#/forgot-password');
+});
+
+document.getElementById('forgotPasswordForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgotEmail').value;
+    const btn   = e.target.querySelector('button[type="submit"]');
+    setButtonLoading(btn);
+
+    try {
+        const response = await fetch('http://localhost:3000/api/password-reset/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+
+        showToast(data.message || 'check your email for a reset link', 'success');
+
+        // Demo: if backend returned the token directly, pre-fill the confirm form
+        if (data._demo_reset_token) {
+            localStorage.setItem('_demo_reset_token', data._demo_reset_token);
+            showToast('demo mode: reset token stored — redirecting…', 'info', 2000);
+            setTimeout(() => navigateTo('#/reset-password'), 2000);
+        }
+    } catch (err) {
+        // Offline fallback: just move to reset page and let user type token manually
+        showToast('backend unavailable — enter your reset token manually', 'warning');
+        navigateTo('#/reset-password');
+    } finally {
+        removeButtonLoading(btn);
+    }
+});
+
+// ─── RESET PASSWORD (confirm) ─────────────────────────────────
+window.addEventListener('hashchange', () => {
+    // Pre-fill token field when navigating to reset page
+    if (window.location.hash === '#/reset-password') {
+        const stored = localStorage.getItem('_demo_reset_token');
+        const tokenInput = document.getElementById('resetToken');
+        if (tokenInput && stored) tokenInput.value = stored;
+    }
+});
+
+document.getElementById('resetPasswordConfirmForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const token       = document.getElementById('resetToken').value.trim();
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPass = document.getElementById('confirmNewPassword').value;
+    const btn         = e.target.querySelector('button[type="submit"]');
+
+    if (newPassword !== confirmPass) {
+        showToast('passwords do not match', 'error'); return;
+    }
+    if (newPassword.length < 6) {
+        showToast('password must be at least 6 characters', 'error'); return;
+    }
+
+    setButtonLoading(btn);
+    try {
+        const response = await fetch('http://localhost:3000/api/password-reset/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, newPassword })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.removeItem('_demo_reset_token');
+            showToast('password reset successfully! please log in', 'success');
+            e.target.reset();
+            navigateTo('#/login');
+        } else {
+            showToast(data.error || 'reset failed', 'error');
+        }
+    } catch (err) {
+        showToast('backend unavailable', 'error');
+    } finally {
+        removeButtonLoading(btn);
+    }
+});
+
+// ─── PROFILE ─────────────────────────────────────────────────
 function showLoggedInNav(user) {
     navNotLoggedIn.setAttribute('style', 'display: none !important');
     navLoggedIn.setAttribute('style', 'display: block !important');
     usernameDisplay.textContent = user.firstName || 'Admin';
-
     document.querySelectorAll('.role-admin').forEach(link => {
         link.style.display = (user.role === 'Admin' || user.role === 'admin') ? 'block' : 'none';
     });
-    
     document.querySelectorAll('.role-user').forEach(link => {
         link.style.display = (user.role === 'User' || user.role === 'user') ? 'block' : 'none';
     });
@@ -485,51 +500,21 @@ function showLoggedInNav(user) {
 function renderProfile() {
     const user = currentUser;
     if (!user) return;
-    
-    document.getElementById('profileName').textContent = `${user.firstName} ${user.lastName}`;
+    document.getElementById('profileName').textContent  = `${user.firstName} ${user.lastName}`;
     document.getElementById('profileEmail').textContent = user.email;
-    document.getElementById('profileRole').textContent = user.role;
-}
-
-function updateProfileDisplay(user) {
-    if (!user) return;
-    document.getElementById('profileName').textContent = `${user.firstName} ${user.lastName}`;
-    document.getElementById('profileEmail').textContent = user.email;
-    document.getElementById('profileRole').textContent = user.role;
+    document.getElementById('profileRole').textContent  = user.role;
 }
 
 document.getElementById('editProfileBtn')?.addEventListener('click', () => {
     showToast('edit profile feature coming soon!', 'info');
 });
 
-profileLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    navigateTo('#/profile');
-});
+profileLink.addEventListener('click',     (e) => { e.preventDefault(); navigateTo('#/profile'); });
+employeesLink.addEventListener('click',   (e) => { e.preventDefault(); navigateTo('#/employees'); });
+departmentsLink.addEventListener('click', (e) => { e.preventDefault(); navigateTo('#/departments'); });
+accountsLink.addEventListener('click',    (e) => { e.preventDefault(); navigateTo('#/accounts'); });
 
-employeesLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    navigateTo('#/employees');
-});
-
-logoutLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    
-    const userName = currentUser ? currentUser.firstName : 'user';
-    
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('loggedInUser');
-    sessionStorage.removeItem('authToken');
-    
-    setAuthState(false);
-    
-    navLoggedIn.style.display = 'none';
-    navNotLoggedIn.style.display = 'flex';
-    
-    showToast(`goodbye, ${userName}!`, 'info');
-    navigateTo('#/');
-});
-
+// ─── EMPLOYEES ───────────────────────────────────────────────
 addEmployeeBtn.addEventListener('click', () => {
     employeeFormSection.style.display = 'block';
     document.getElementById('employeeFormTitle').textContent = 'Add Employee';
@@ -537,19 +522,14 @@ addEmployeeBtn.addEventListener('click', () => {
     document.getElementById('empId').removeAttribute('readonly');
     delete document.getElementById('employeeForm').dataset.originalId;
 });
-
-cancelEmployeeBtn.addEventListener('click', () => {
-    employeeFormSection.style.display = 'none';
-});
+cancelEmployeeBtn.addEventListener('click', () => { employeeFormSection.style.display = 'none'; });
 
 function loadEmployees() {
     const employees = window.db.employees;
     const tbody = document.getElementById('employeesTableBody');
-    
-    if (employees.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">no employees.</td></tr>';
-    } else {
-        tbody.innerHTML = employees.map(emp => `
+    tbody.innerHTML = employees.length === 0
+        ? '<tr><td colspan="5" class="text-center text-muted">no employees.</td></tr>'
+        : employees.map(emp => `
             <tr>
                 <td>${emp.id}</td>
                 <td>${emp.email}</td>
@@ -559,31 +539,25 @@ function loadEmployees() {
                     <button class="btn btn-sm btn-primary" onclick="editEmployee('${emp.id}')">edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${emp.id}')">delete</button>
                 </td>
-            </tr>
-        `).join('');
-    }
+            </tr>`).join('');
 }
 
 function editEmployee(id) {
-    const employee = window.db.employees.find(emp => emp.id === id);
-    
-    if (employee) {
-        employeeFormSection.style.display = 'block';
-        document.getElementById('employeeFormTitle').textContent = 'Edit Employee';
-        document.getElementById('empId').value = employee.id;
-        document.getElementById('empEmail').value = employee.email;
-        document.getElementById('empPosition').value = employee.position;
-        document.getElementById('empDepartment').value = employee.department;
-        document.getElementById('empHireDate').value = employee.hireDate;
-        
-        document.getElementById('empId').setAttribute('readonly', true);
-        document.getElementById('employeeForm').dataset.originalId = id;
-    }
+    const emp = window.db.employees.find(e => e.id === id);
+    if (!emp) return;
+    employeeFormSection.style.display = 'block';
+    document.getElementById('employeeFormTitle').textContent = 'Edit Employee';
+    document.getElementById('empId').value         = emp.id;
+    document.getElementById('empEmail').value      = emp.email;
+    document.getElementById('empPosition').value   = emp.position;
+    document.getElementById('empDepartment').value = emp.department;
+    document.getElementById('empHireDate').value   = emp.hireDate;
+    document.getElementById('empId').setAttribute('readonly', true);
+    document.getElementById('employeeForm').dataset.originalId = id;
 }
 
 document.getElementById('employeeForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    
     const employee = {
         id: document.getElementById('empId').value,
         email: document.getElementById('empEmail').value,
@@ -591,27 +565,17 @@ document.getElementById('employeeForm').addEventListener('submit', (e) => {
         department: document.getElementById('empDepartment').value,
         hireDate: document.getElementById('empHireDate').value
     };
-    
     const originalId = document.getElementById('employeeForm').dataset.originalId;
-    
     if (originalId) {
-        const empIndex = window.db.employees.findIndex(e => e.id === originalId);
-        if (empIndex !== -1) {
-            window.db.employees[empIndex] = employee;
-            showToast('employee updated successfully', 'success');
-        }
+        const idx = window.db.employees.findIndex(e => e.id === originalId);
+        if (idx !== -1) { window.db.employees[idx] = employee; showToast('employee updated', 'success'); }
         delete document.getElementById('employeeForm').dataset.originalId;
         document.getElementById('empId').removeAttribute('readonly');
     } else {
-        const existingEmployee = window.db.employees.find(e => e.id === employee.id);
-        if (existingEmployee) {
-            showToast('an employee with this id already exists', 'error');
-            return;
-        }
+        if (window.db.employees.find(e => e.id === employee.id)) { showToast('employee ID already exists', 'error'); return; }
         window.db.employees.push(employee);
-        showToast('employee added successfully', 'success');
+        showToast('employee added', 'success');
     }
-    
     saveToStorage();
     employeeFormSection.style.display = 'none';
     document.getElementById('employeeForm').reset();
@@ -621,22 +585,12 @@ document.getElementById('employeeForm').addEventListener('submit', (e) => {
 function deleteEmployee(id) {
     if (confirm(`delete employee "${id}"?`)) {
         window.db.employees = window.db.employees.filter(e => e.id !== id);
-        saveToStorage();
-        loadEmployees();
-        showToast('employee deleted successfully', 'success');
+        saveToStorage(); loadEmployees();
+        showToast('employee deleted', 'success');
     }
 }
 
-departmentsLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    navigateTo('#/departments');
-});
-
-accountsLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    navigateTo('#/accounts');
-});
-
+// ─── DEPARTMENTS ─────────────────────────────────────────────
 addDepartmentBtn.addEventListener('click', () => {
     departmentFormSection.style.display = 'block';
     document.getElementById('departmentFormTitle').textContent = 'Add Department';
@@ -644,29 +598,14 @@ addDepartmentBtn.addEventListener('click', () => {
     document.getElementById('deptName').removeAttribute('readonly');
     delete document.getElementById('departmentForm').dataset.originalName;
 });
-
-cancelDepartmentBtn.addEventListener('click', () => {
-    departmentFormSection.style.display = 'none';
-});
-
-addAccountBtn.addEventListener('click', () => {
-    accountFormSection.style.display = 'block';
-    document.getElementById('accountFormTitle').textContent = 'Add Account';
-    document.getElementById('accountForm').reset();
-});
-
-cancelAccountBtn.addEventListener('click', () => {
-    accountFormSection.style.display = 'none';
-});
+cancelDepartmentBtn.addEventListener('click', () => { departmentFormSection.style.display = 'none'; });
 
 function loadDepartments() {
     const departments = window.db.departments;
     const tbody = document.getElementById('departmentsTableBody');
-    
-    if (departments.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">no departments.</td></tr>';
-    } else {
-        tbody.innerHTML = departments.map(dept => `
+    tbody.innerHTML = departments.length === 0
+        ? '<tr><td colspan="3" class="text-center text-muted">no departments.</td></tr>'
+        : departments.map(dept => `
             <tr>
                 <td>${dept.name}</td>
                 <td>${dept.description}</td>
@@ -674,33 +613,62 @@ function loadDepartments() {
                     <button class="btn btn-sm btn-primary" onclick="editDepartment('${dept.name}')">edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteDepartment('${dept.name}')">delete</button>
                 </td>
-            </tr>
-        `).join('');
-    }
+            </tr>`).join('');
 }
 
 function editDepartment(name) {
-    const department = window.db.departments.find(dept => dept.name === name);
-    
-    if (department) {
-        departmentFormSection.style.display = 'block';
-        document.getElementById('departmentFormTitle').textContent = 'Edit Department';
-        document.getElementById('deptName').value = department.name;
-        document.getElementById('deptDescription').value = department.description;
-        
-        document.getElementById('deptName').setAttribute('readonly', true);
-        document.getElementById('departmentForm').dataset.originalName = name;
+    const dept = window.db.departments.find(d => d.name === name);
+    if (!dept) return;
+    departmentFormSection.style.display = 'block';
+    document.getElementById('departmentFormTitle').textContent = 'Edit Department';
+    document.getElementById('deptName').value        = dept.name;
+    document.getElementById('deptDescription').value = dept.description;
+    document.getElementById('deptName').setAttribute('readonly', true);
+    document.getElementById('departmentForm').dataset.originalName = name;
+}
+
+document.getElementById('departmentForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const department = { name: document.getElementById('deptName').value, description: document.getElementById('deptDescription').value };
+    const originalName = document.getElementById('departmentForm').dataset.originalName;
+    if (originalName) {
+        const idx = window.db.departments.findIndex(d => d.name === originalName);
+        if (idx !== -1) { window.db.departments[idx] = department; showToast('department updated', 'success'); }
+        delete document.getElementById('departmentForm').dataset.originalName;
+        document.getElementById('deptName').removeAttribute('readonly');
+    } else {
+        if (window.db.departments.find(d => d.name === department.name)) { showToast('department already exists', 'error'); return; }
+        window.db.departments.push(department);
+        showToast('department added', 'success');
+    }
+    saveToStorage();
+    departmentFormSection.style.display = 'none';
+    document.getElementById('departmentForm').reset();
+    loadDepartments();
+});
+
+function deleteDepartment(name) {
+    if (confirm(`delete department "${name}"?`)) {
+        window.db.departments = window.db.departments.filter(d => d.name !== name);
+        saveToStorage(); loadDepartments();
+        showToast('department deleted', 'success');
     }
 }
+
+// ─── ACCOUNTS ────────────────────────────────────────────────
+addAccountBtn.addEventListener('click', () => {
+    accountFormSection.style.display = 'block';
+    document.getElementById('accountFormTitle').textContent = 'Add Account';
+    document.getElementById('accountForm').reset();
+});
+cancelAccountBtn.addEventListener('click', () => { accountFormSection.style.display = 'none'; });
 
 function loadAccounts() {
     const accounts = window.db.accounts;
     const tbody = document.getElementById('accountsTableBody');
-    
-    if (accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">no accounts.</td></tr>';
-    } else {
-        tbody.innerHTML = accounts.map(account => `
+    tbody.innerHTML = accounts.length === 0
+        ? '<tr><td colspan="5" class="text-center text-muted">no accounts.</td></tr>'
+        : accounts.map(account => `
             <tr>
                 <td>${account.firstName} ${account.lastName}</td>
                 <td>${account.email}</td>
@@ -711,181 +679,87 @@ function loadAccounts() {
                     <button class="btn btn-sm btn-warning" onclick="resetAccountPassword('${account.email}')">reset password</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteAccount('${account.email}')">delete</button>
                 </td>
-            </tr>
-        `).join('');
-    }
+            </tr>`).join('');
 }
-
-document.getElementById('departmentForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    
-    const department = {
-        name: document.getElementById('deptName').value,
-        description: document.getElementById('deptDescription').value
-    };
-    
-    const originalName = document.getElementById('departmentForm').dataset.originalName;
-    
-    if (originalName) {
-        const deptIndex = window.db.departments.findIndex(d => d.name === originalName);
-        if (deptIndex !== -1) {
-            window.db.departments[deptIndex] = department;
-            showToast('department updated successfully', 'success');
-        }
-        delete document.getElementById('departmentForm').dataset.originalName;
-        document.getElementById('deptName').removeAttribute('readonly');
-    } else {
-        const existingDept = window.db.departments.find(d => d.name === department.name);
-        if (existingDept) {
-            showToast('a department with this name already exists', 'error');
-            return;
-        }
-        window.db.departments.push(department);
-        showToast('department added successfully', 'success');
-    }
-    
-    saveToStorage();
-    departmentFormSection.style.display = 'none';
-    document.getElementById('departmentForm').reset();
-    loadDepartments();
-});
 
 document.getElementById('accountForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    
     const password = document.getElementById('accPassword').value;
-    
-    if (password.length < 6) {
-        showToast('password must be at least 6 characters long', 'error');
-        return;
-    }
-    
+    if (password.length < 6) { showToast('password must be at least 6 characters long', 'error'); return; }
     const account = {
         firstName: document.getElementById('accFirstName').value,
-        lastName: document.getElementById('accLastName').value,
-        email: document.getElementById('accEmail').value,
-        password: password,
-        role: document.getElementById('accRole').value,
-        verified: document.getElementById('accVerified').checked
+        lastName:  document.getElementById('accLastName').value,
+        email:     document.getElementById('accEmail').value,
+        password,
+        role:      document.getElementById('accRole').value,
+        verified:  document.getElementById('accVerified').checked
     };
-    
     const originalEmail = document.getElementById('accountForm').dataset.originalEmail;
-    
     if (originalEmail) {
-        const accountIndex = window.db.accounts.findIndex(acc => acc.email === originalEmail);
-        if (accountIndex !== -1) {
-            window.db.accounts[accountIndex] = account;
-            showToast('account updated successfully', 'success');
-        }
+        const idx = window.db.accounts.findIndex(acc => acc.email === originalEmail);
+        if (idx !== -1) { window.db.accounts[idx] = account; showToast('account updated', 'success'); }
         delete document.getElementById('accountForm').dataset.originalEmail;
     } else {
-        const existingAccount = window.db.accounts.find(acc => acc.email === account.email);
-        if (existingAccount) {
-            showToast('an account with this email already exists', 'error');
-            return;
-        }
+        if (window.db.accounts.find(acc => acc.email === account.email)) { showToast('email already exists', 'error'); return; }
         window.db.accounts.push(account);
-        showToast('account created successfully', 'success');
+        showToast('account created', 'success');
     }
-    
     saveToStorage();
     accountFormSection.style.display = 'none';
     document.getElementById('accountForm').reset();
     loadAccounts();
 });
 
-function deleteDepartment(name) {
-    if (confirm(`delete department "${name}"?`)) {
-        window.db.departments = window.db.departments.filter(d => d.name !== name);
-        saveToStorage();
-        loadDepartments();
-        showToast('department deleted successfully', 'success');
-    }
+function editAccount(email) {
+    const account = window.db.accounts.find(acc => acc.email === email);
+    if (!account) return;
+    accountFormSection.style.display = 'block';
+    document.getElementById('accountFormTitle').textContent = 'Edit Account';
+    document.getElementById('accFirstName').value = account.firstName;
+    document.getElementById('accLastName').value  = account.lastName;
+    document.getElementById('accEmail').value     = account.email;
+    document.getElementById('accPassword').value  = account.password;
+    document.getElementById('accRole').value      = account.role || 'User';
+    document.getElementById('accVerified').checked= account.verified;
+    document.getElementById('accountForm').dataset.originalEmail = email;
 }
 
 function deleteAccount(email) {
     if (currentUser && email === currentUser.email) {
-        showToast('you cannot delete your own account while logged in', 'warning');
-        return;
+        showToast('you cannot delete your own account while logged in', 'warning'); return;
     }
-    
     if (confirm(`delete account "${email}"?`)) {
         window.db.accounts = window.db.accounts.filter(acc => acc.email !== email);
-        saveToStorage();
-        loadAccounts();
-        showToast('account deleted successfully', 'success');
-    }
-}
-
-function editAccount(email) {
-    const account = window.db.accounts.find(acc => acc.email === email);
-    
-    if (account) {
-        accountFormSection.style.display = 'block';
-        document.getElementById('accountFormTitle').textContent = 'Edit Account';
-        document.getElementById('accFirstName').value = account.firstName;
-        document.getElementById('accLastName').value = account.lastName;
-        document.getElementById('accEmail').value = account.email;
-        document.getElementById('accPassword').value = account.password;
-        document.getElementById('accRole').value = account.role || 'User';
-        document.getElementById('accVerified').checked = account.verified;
-        
-        document.getElementById('accountForm').dataset.originalEmail = email;
+        saveToStorage(); loadAccounts();
+        showToast('account deleted', 'success');
     }
 }
 
 function resetAccountPassword(email) {
     const newPassword = prompt('enter new password for ' + email + ' (min 6 characters):');
-    if (newPassword) {
-        if (newPassword.length < 6) {
-            showToast('password must be at least 6 characters long', 'error');
-            return;
-        }
-        
-        const accountIndex = window.db.accounts.findIndex(acc => acc.email === email);
-        
-        if (accountIndex !== -1) {
-            window.db.accounts[accountIndex].password = newPassword;
-            saveToStorage();
-            showToast('password reset successfully!', 'success');
-            loadAccounts();
-        }
+    if (!newPassword) return;
+    if (newPassword.length < 6) { showToast('password must be at least 6 characters long', 'error'); return; }
+    const idx = window.db.accounts.findIndex(acc => acc.email === email);
+    if (idx !== -1) {
+        window.db.accounts[idx].password = newPassword;
+        saveToStorage(); loadAccounts();
+        showToast('password reset successfully!', 'success');
     }
 }
 
 resetPasswordBtn.addEventListener('click', () => {
     const email = document.getElementById('accEmail').value;
-    if (email) {
-        resetAccountPassword(email);
-        accountFormSection.style.display = 'none';
-    } else {
-        showToast('please fill in the email field first', 'warning');
-    }
+    if (email) { resetAccountPassword(email); accountFormSection.style.display = 'none'; }
+    else showToast('please fill in the email field first', 'warning');
 });
 
-myRequestsLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    navigateTo('#/my-requests');
-});
-
-newRequestBtn.addEventListener('click', () => {
-    requestModal.style.display = 'block';
-});
-
-createFirstRequestBtn.addEventListener('click', () => {
-    requestModal.style.display = 'block';
-});
-
-closeRequestModal.addEventListener('click', () => {
-    requestModal.style.display = 'none';
-    requestForm.reset();
-});
-
+// ─── REQUESTS ────────────────────────────────────────────────
+myRequestsLink.addEventListener('click', (e) => { e.preventDefault(); navigateTo('#/my-requests'); });
+newRequestBtn.addEventListener('click', () => { requestModal.style.display = 'block'; });
+createFirstRequestBtn.addEventListener('click', () => { requestModal.style.display = 'block'; });
+closeRequestModal.addEventListener('click', () => { requestModal.style.display = 'none'; requestForm.reset(); });
 requestModal.addEventListener('click', (e) => {
-    if (e.target === requestModal) {
-        requestModal.style.display = 'none';
-        requestForm.reset();
-    }
+    if (e.target === requestModal) { requestModal.style.display = 'none'; requestForm.reset(); }
 });
 
 function addRequestItem() {
@@ -902,99 +776,75 @@ function addRequestItem() {
 
 function loadMyRequests() {
     if (!currentUser) return;
-    
     const myRequests = window.db.requests.filter(req => req.userEmail === currentUser.email);
-    
     if (myRequests.length === 0) {
         noRequestsMessage.style.display = 'block';
         requestsTable.style.display = 'none';
     } else {
         noRequestsMessage.style.display = 'none';
         requestsTable.style.display = 'table';
-        
-        const tbody = document.getElementById('requestsTableBody');
-        tbody.innerHTML = myRequests.map(req => `
+        document.getElementById('requestsTableBody').innerHTML = myRequests.map(req => `
             <tr>
                 <td>${req.type}</td>
-                <td>${req.items.map(item => `${item.name} (${item.quantity})`).join(', ')}</td>
+                <td>${req.items.map(i => `${i.name} (${i.quantity})`).join(', ')}</td>
                 <td><span class="badge bg-${req.status === 'Pending' ? 'warning' : req.status === 'Approved' ? 'success' : 'danger'}">${req.status}</span></td>
                 <td>${new Date(req.date).toLocaleDateString()}</td>
                 <td>
                     <button class="btn btn-sm btn-info" onclick="viewRequest('${req.id}')">view</button>
                     ${req.status === 'Pending' ? `<button class="btn btn-sm btn-danger" onclick="deleteRequest('${req.id}')">delete</button>` : ''}
                 </td>
-            </tr>
-        `).join('');
+            </tr>`).join('');
     }
 }
 
 requestForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    
     if (!currentUser) return;
-    
-    const itemInputs = document.querySelectorAll('#requestItems .input-group');
-    const items = Array.from(itemInputs).map(group => {
+    const items = Array.from(document.querySelectorAll('#requestItems .input-group')).map(group => {
         const inputs = group.querySelectorAll('input');
-        return {
-            name: inputs[0].value,
-            quantity: parseInt(inputs[1].value)
-        };
+        return { name: inputs[0].value, quantity: parseInt(inputs[1].value) };
     });
-    
     const request = {
         id: Date.now().toString(),
         userEmail: currentUser.email,
         userName: `${currentUser.firstName} ${currentUser.lastName}`,
         type: document.getElementById('requestType').value,
-        items: items,
-        status: 'Pending',
+        items, status: 'Pending',
         date: new Date().toISOString()
     };
-    
     window.db.requests.push(request);
     saveToStorage();
-    
     requestModal.style.display = 'none';
     requestForm.reset();
     loadMyRequests();
-    
     showToast('request submitted successfully!', 'success');
 });
 
 function viewRequest(id) {
-    const request = window.db.requests.find(r => r.id === id);
-    if (request) {
-        alert(`request details:\ntype: ${request.type}\nitems: ${request.items.map(i => `${i.name} (${i.quantity})`).join(', ')}\nstatus: ${request.status}`);
-    }
+    const req = window.db.requests.find(r => r.id === id);
+    if (req) alert(`request details:\ntype: ${req.type}\nitems: ${req.items.map(i => `${i.name} (${i.quantity})`).join(', ')}\nstatus: ${req.status}`);
 }
 
 function deleteRequest(id) {
     if (confirm('delete this request?')) {
         window.db.requests = window.db.requests.filter(r => r.id !== id);
-        saveToStorage();
-        loadMyRequests();
-        showToast('request deleted successfully', 'success');
+        saveToStorage(); loadMyRequests();
+        showToast('request deleted', 'success');
     }
 }
 
-allRequestsLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    navigateTo('#/all-requests');
-});
+allRequestsLink.addEventListener('click', (e) => { e.preventDefault(); navigateTo('#/all-requests'); });
 
 function loadAllRequests() {
     const allRequests = window.db.requests;
     const tbody = document.getElementById('allRequestsTableBody');
-    
-    if (allRequests.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">no requests.</td></tr>';
-    } else {
-        tbody.innerHTML = allRequests.map(req => `
+    tbody.innerHTML = allRequests.length === 0
+        ? '<tr><td colspan="6" class="text-center text-muted">no requests.</td></tr>'
+        : allRequests.map(req => `
             <tr>
                 <td>${req.userName}</td>
                 <td>${req.type}</td>
-                <td>${req.items.map(item => `${item.name} (${item.quantity})`).join(', ')}</td>
+                <td>${req.items.map(i => `${i.name} (${i.quantity})`).join(', ')}</td>
                 <td><span class="badge bg-${req.status === 'Pending' ? 'warning' : req.status === 'Approved' ? 'success' : 'danger'}">${req.status}</span></td>
                 <td>${new Date(req.date).toLocaleDateString()}</td>
                 <td>
@@ -1004,43 +854,28 @@ function loadAllRequests() {
                         <button class="btn btn-sm btn-danger" onclick="rejectRequest('${req.id}')">reject</button>
                     ` : ''}
                 </td>
-            </tr>
-        `).join('');
-    }
+            </tr>`).join('');
 }
 
 function approveRequest(id) {
     if (confirm('approve this request?')) {
-        const requestIndex = window.db.requests.findIndex(r => r.id === id);
-        if (requestIndex !== -1) {
-            window.db.requests[requestIndex].status = 'Approved';
-            saveToStorage();
-            loadAllRequests();
-            showToast('request approved', 'success');
-        }
+        const idx = window.db.requests.findIndex(r => r.id === id);
+        if (idx !== -1) { window.db.requests[idx].status = 'Approved'; saveToStorage(); loadAllRequests(); showToast('request approved', 'success'); }
     }
 }
 
 function rejectRequest(id) {
     if (confirm('reject this request?')) {
-        const requestIndex = window.db.requests.findIndex(r => r.id === id);
-        if (requestIndex !== -1) {
-            window.db.requests[requestIndex].status = 'Rejected';
-            saveToStorage();
-            loadAllRequests();
-            showToast('request rejected', 'info');
-        }
+        const idx = window.db.requests.findIndex(r => r.id === id);
+        if (idx !== -1) { window.db.requests[idx].status = 'Rejected'; saveToStorage(); loadAllRequests(); showToast('request rejected', 'info'); }
     }
 }
 
+// ─── INIT ────────────────────────────────────────────────────
 window.addEventListener('load', () => {
-    if (!window.location.hash) {
-        window.location.hash = '#/';
-    }
-    
-    const authToken = sessionStorage.getItem('authToken') || localStorage.getItem('auth_token');
+    if (!window.location.hash) window.location.hash = '#/';
+    const authToken    = sessionStorage.getItem('authToken') || localStorage.getItem('auth_token');
     const loggedInUser = localStorage.getItem('loggedInUser');
-    
     if (authToken && loggedInUser) {
         const user = JSON.parse(loggedInUser);
         setAuthState(true, user);
@@ -1048,6 +883,5 @@ window.addEventListener('load', () => {
     } else {
         setAuthState(false);
     }
-    
     handleRouting();
 });
